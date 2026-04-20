@@ -2,101 +2,165 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SNO ADVANCED DASHBOARD</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
     <style>
-        body { background: #000; color: #0f0; font-family: monospace; }
-        .stat-card { border: 1px solid #1a1a1a; background: #050505; transition: 0.3s; }
-        .stat-card:hover { border-color: #0f0; transform: translateY(-5px); }
-        .btn-sno { border: 1px solid #0f0; }
-        .active { background: #0f0; color: #000; box-shadow: 0 0 15px #0f0; }
+        @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap');
+        body { 
+            background: #000; 
+            color: #0f0; 
+            font-family: 'Space Mono', monospace; 
+            overflow-x: hidden;
+        }
+        .stat-card { 
+            border: 1px solid #1a1a1a; 
+            background: #050505; 
+            transition: 0.3s; 
+        }
+        .stat-card:hover { 
+            border-color: #0f0; 
+            transform: translateY(-5px); 
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.1);
+        }
+        .btn-sno { 
+            border: 1px solid #0f0; 
+            background: transparent;
+            color: #0f0;
+            transition: 0.3s;
+        }
+        .btn-sno.active { 
+            background: #0f0; 
+            color: #000; 
+            box-shadow: 0 0 20px #0f0; 
+            font-weight: bold;
+        }
+        .glitch-text {
+            text-shadow: 0 0 10px #0f0;
+        }
+        .hit-anim {
+            animation: pulse-hit 0.5s infinite;
+        }
+        @keyframes pulse-hit {
+            0% { color: #0f0; }
+            50% { color: #fff; text-shadow: 0 0 20px #fff; }
+            100% { color: #0f0; }
+        }
     </style>
 </head>
-<body class="p-5 flex flex-col items-center">
-    
-    <h1 class="text-3xl font-black mb-8 tracking-[0.3em] text-white">SNO SYSTEM v3</h1>
+<body class="p-5 flex flex-col items-center min-h-screen">
 
-    <div class="mb-5 text-gray-500 text-[10px] uppercase tracking-widest">توجيه التيرمكس (Target Control)</div>
-    <div class="grid grid-cols-5 md:grid-cols-10 gap-2 mb-10" id="controls"></div>
+    <header class="text-center mt-5 mb-10">
+        <h1 class="text-4xl font-black tracking-[0.2em] glitch-text italic">SNO SYSTEM v3</h1>
+        <div class="h-1 w-full bg-green-900 mt-2 rounded-full opacity-30"></div>
+    </header>
 
-    <div class="w-full max-w-5xl">
-        <div class="text-right mb-4 text-xs text-green-800 font-bold border-r-4 border-green-500 pr-2">إحصائيات الصيد (Hunting Stats):</div>
-        <div class="grid grid-cols-2 md:grid-cols-5 gap-4" id="statsGrid">
+    <div class="w-full max-w-4xl mb-12">
+        <div class="text-center text-[10px] text-gray-600 mb-4 tracking-widest uppercase italic">توجيه التيرمكس (Target Control)</div>
+        <div class="grid grid-cols-5 md:grid-cols-10 gap-2 px-2" id="controls">
             </div>
     </div>
 
-    <div class="w-full max-w-5xl mt-10">
-        <div class="text-[10px] text-gray-600 mb-2 uppercase">آخر صيدة (Last Hit):</div>
-        <div id="lastHit" class="p-4 bg-green-950/20 border border-green-900 text-white text-center italic">
-            بانتظار الصيد...
-        </div>
+    <div class="w-full max-w-2xl mb-12 p-8 bg-zinc-950 rounded-lg border border-green-950 text-center relative overflow-hidden">
+        <div class="text-[9px] text-green-900 absolute top-2 right-4 uppercase tracking-tighter">Live Stream Active</div>
+        <div id="u" class="text-5xl md:text-7xl font-black tracking-tighter text-white mb-2">@......</div>
+        <div id="s" class="text-xs text-green-800 italic uppercase tracking-widest">بانتظار إشارة التيرمكس...</div>
     </div>
 
+    <div class="w-full max-w-5xl px-2">
+        <div class="text-right mb-4 text-xs text-green-700 font-bold border-r-4 border-green-700 pr-2 italic">إحصائيات الصيد (Hunting Stats):</div>
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-3" id="statsGrid">
+            </div>
+    </div>
+
+    <footer class="mt-20 text-[9px] text-gray-800 tracking-widest uppercase italic border-t border-zinc-900 pt-5 w-full text-center">
+        Developed for Omar Mohammed Abdullah | The Little Developer
+    </footer>
+
     <script>
-        const config = { databaseURL: "https://user-c912b-default-rtdb.firebaseio.com" };
-        firebase.initializeApp(config);
+        // --- إعدادات الفايربيز الخاصة بك ---
+        const firebaseConfig = {
+            databaseURL: "https://user-c912b-default-rtdb.firebaseio.com"
+        };
+
+        // تشغيل الفايربيز
+        firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
-        // 1. إنشاء الأزرار وصناديق الإحصائيات
+        // 1. توليد واجهة الأزرار والصناديق
         const controls = document.getElementById('controls');
         const statsGrid = document.getElementById('statsGrid');
 
         for (let i = 1; i <= 10; i++) {
-            // أزرار التحكم
+            // إضافة الأزرار من 1 إلى 10
             controls.innerHTML += `
-                <button onclick="setLength(${i})" id="btn-${i}" class="btn-sno p-2 rounded text-sm font-bold w-10">${i}</button>
+                <button onclick="setLength(${i})" id="btn-${i}" class="btn-sno py-3 rounded text-sm font-bold">${i}</button>
             `;
-            // صناديق الإحصائيات
+            // إضافة صناديق الإحصائيات من 1 إلى 10
             statsGrid.innerHTML += `
-                <div class="stat-card p-4 rounded text-center">
-                    <div class="text-[10px] text-gray-500 mb-1 font-bold italic underline">${i} LETTERS</div>
-                    <div id="count-${i}" class="text-2xl font-black text-white">0</div>
+                <div class="stat-card p-5 rounded text-center">
+                    <div class="text-[9px] text-gray-600 mb-2 uppercase font-bold italic">${i} Letters</div>
+                    <div id="count-${i}" class="text-3xl font-black text-white">0</div>
                 </div>
             `;
         }
 
-        // 2. إرسال الأوامر
+        // 2. دالة إرسال طول اليوزر المطلوب للتيرمكس
         function setLength(num) {
             db.ref('settings').set({ targetLength: num });
-            document.querySelectorAll('.btn-sno').forEach(b => b.classList.remove('active'));
-            document.getElementById('btn-' + num).classList.add('active');
         }
 
-        // 3. تحديث الإحصائيات (الحساب الحقيقي من سجل الصيد)
+        // 3. الاستماع لليوزر الذي يتم فصحه الآن (المسار live)
+        db.ref('live').on('value', (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+                const userEl = document.getElementById('u');
+                const statusEl = document.getElementById('s');
+                
+                userEl.innerText = "@" + data.u;
+                
+                if (data.h === "YES") {
+                    userEl.classList.add('hit-anim');
+                    statusEl.innerText = "🔥 HIT FOUND! CHECK LOGS";
+                    statusEl.style.color = "#fff";
+                } else {
+                    userEl.classList.remove('hit-anim');
+                    statusEl.innerText = "LIVE SCANNING...";
+                    statusEl.style.color = "#040";
+                }
+            }
+        });
+
+        // 4. الاستماع لسجل الصيد وتحديث العدادات في الصناديق
         db.ref('hunts').on('value', (snapshot) => {
             const data = snapshot.val();
-            const counts = {};
-            // تصفير العدادات أولاً
-            for(let i=1; i<=10; i++) counts[i] = 0;
-
             if (data) {
-                const entries = Object.values(data);
-                entries.forEach(item => {
-                    if (counts[item.len]) counts[item.len]++;
+                const counts = {1:0, 2:0, 3:0, 4:0, 5:0, 6:0, 7:0, 8:0, 9:0, 10:0};
+                Object.values(data).forEach(item => {
+                    if (item.len && counts[item.len] !== undefined) {
+                        counts[item.len]++;
+                    }
                 });
-
-                // تحديث الشاشة
-                for(let i=1; i<=10; i++) {
-                    document.getElementById(`count-${i}`).innerText = counts[i];
+                // تحديث الأرقام داخل الصناديق
+                for (let i = 1; i <= 10; i++) {
+                    const countEl = document.getElementById(`count-${i}`);
+                    if (countEl) countEl.innerText = counts[i];
                 }
-
-                // عرض آخر صيدة
-                const last = entries[entries.length - 1];
-                document.getElementById('lastHit').innerText = `@${last.user} (طوله: ${last.len})`;
             }
         });
 
-        // مزامنة الزر المختار حالياً
-        db.ref('settings/targetLength').on('value', (s) => {
-            const val = s.val();
-            if(val) {
+        // 5. مزامنة حالة الأزرار مع الإعداد الحالي في القاعدة
+        db.ref('settings/targetLength').on('value', (snapshot) => {
+            const val = snapshot.val();
+            if (val) {
                 document.querySelectorAll('.btn-sno').forEach(b => b.classList.remove('active'));
-                document.getElementById('btn-' + val).classList.add('active');
+                const activeBtn = document.getElementById('btn-' + val);
+                if (activeBtn) activeBtn.classList.add('active');
             }
         });
+
     </script>
 </body>
-  </html>
-  
+</html>
